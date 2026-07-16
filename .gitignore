@@ -1,0 +1,23 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Project development files
+HANDOFF.md
+TODO.md
+WHISPER.md
+config.toml
+
+# Test audio samples
+sample/
+
+# whisper.cpp build artifacts
+whisper.cpp/build/
+whisper.cpp/models/*.bin
