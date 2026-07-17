@@ -18,14 +18,26 @@ Local, offline push-to-talk dictation tool. Two-stage pipeline: speech-to-text v
   ```
 - Python 3.12+ with `uv`
 
-## Usage
+## Installation
+
+Run the installer from the project root:
 
 ```bash
-$ chmod +x scripts/run.sh
-$ ./scripts/run.sh
+chmod +x install.sh
+./install.sh
 ```
 
-Hold **Right Ctrl** and speak. Release — cleaned text appears in the focused application.
+This installs the `dictatr` launcher into `~/.local/bin`.
+
+> **Note:** Ensure `~/.local/bin` is in your `PATH`.
+
+## Usage
+
+Start Dictatr from any terminal:
+
+```bash
+dictatr
+```
 
 ## Architecture
 
@@ -42,6 +54,7 @@ Dictatr
 ├── main.py
 ├── pyproject.toml
 ├── README.md
+├── install.sh
 ├── scripts
 │   └── run.sh
 ├── src
