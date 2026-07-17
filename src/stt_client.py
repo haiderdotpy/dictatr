@@ -11,4 +11,6 @@ def speechtotext(audio):
         },
     )
 
+    print(f"STT Time: {response.elapsed.total_seconds():.2f}s")
+
     return (response.json()["text"] if response.status_code == 200 else None)
