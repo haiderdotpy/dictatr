@@ -8,18 +8,23 @@ CHANNELS = 1
 
 _frames = []
 _stream = None
+_frame_queue = None
 
 def _callback(indata, frames, time, status):
     if status:
         print(status) 
     _frames.append(indata.copy())
+    if _frame_queue is not None:
+        _frame_queue.put(indata.copy().tobytes())
 
-def start_capture():
-    global _frames, _stream
+def start_capture(frame_queue):
+    global _frames, _stream, _frame_queue
     _frames = []
+    _frame_queue = frame_queue
     _stream = sd.InputStream(
         samplerate=SAMPLE_RATE,
         channels=CHANNELS,
+        blocksize=320,
         dtype="int16",
         callback=_callback,
     )

@@ -10,5 +10,7 @@ dependencies = [
     "ollama>=0.6.2",
     "requests>=2.34.2",
     "scipy>=1.18.0",
+    "setuptools>=83.0.0",
     "sounddevice>=0.5.5",
+    "webrtcvad-wheels>=2.0.14",
 ]

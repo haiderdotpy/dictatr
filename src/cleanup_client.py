@@ -7,19 +7,26 @@ def cleanup_transcript(transcript):
         messages=[{
             'role': 'user', 
             'content': f'''
-                Clean the following speech transcript.
+                You are converting spoken dictation into text that someone intended to type.
 
-                Rules:
-                - Remove special characters and emojis which don't contribute to the meaning of the transcript.
-                - Remove filler words (um, uh, you know, like) when they do not change meaning.
-                - Restore punctuation and capitalization.
-                - Preserve wording and intent.
-                - Do not remove any content that changes the meaning of the transcript.
-                - Do not summarize, rewrite, or omit information.
-                - Output plain text only.
+                Instructions:
+                - Preserve the speaker's meaning exactly.
+                - Fix punctuation, capitalization, and obvious speech disfluencies.
+                - Remove filler words such as "um", "uh", "like", and "you know" when they do not add meaning.
+                - Keep all information. Do not summarize, expand, or paraphrase.
+                - Format the output based on the speaker's intent:
+                    - Use paragraphs for normal prose.
+                    - Use bullet lists when the speaker is clearly listing items.
+                    - Use numbered lists for ordered steps or instructions.
+                    - Preserve quoted text when obvious.
+                    - If the structure is unclear, leave it as normal prose.
+                    - Do not ever use Markdown formatting in the output.
+                - Output only the final text.
 
                 Transcript:
-                [transcript]{transcript}[/transcript]
+                [transcript]
+                {transcript}
+                [/transcript]
             '''
         }],
         think=False,

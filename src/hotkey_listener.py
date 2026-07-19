@@ -26,7 +26,7 @@ def find_keyboards():
     return keyboards
 
 
-def wait_for_recording():
+def wait_for_recording(frame_queue):
     """
     Blocks until the user performs one push-to-talk action.
 
@@ -68,7 +68,7 @@ def wait_for_recording():
                 if event.value == 1 and not recording:
                     recording = True
                     press_time = time.monotonic()
-                    start_capture()
+                    start_capture(frame_queue)
                     print("Recording...")
 
                 # Key released
@@ -83,4 +83,5 @@ def wait_for_recording():
 
                     print(f"Recorded {duration:.2f}s")
 
+                    frame_queue.put(None)
                     return stop_capture()
