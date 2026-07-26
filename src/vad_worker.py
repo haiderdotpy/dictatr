@@ -35,6 +35,7 @@ class VADSegmenter:
     
 def vad_worker(frame_queue, speech_queue):
     vad = VADSegmenter()
+    index = 0
 
     while True:
         frame = frame_queue.get()
@@ -45,10 +46,14 @@ def vad_worker(frame_queue, speech_queue):
         chunk = vad.process_frame(frame)
 
         if chunk is not None: 
-            speech_queue.put(chunk)
+            speech_queue.put((index, chunk))
+            index += 1
+            print(f"[QUEUE] speech_queue={speech_queue.qsize()}")
 
     chunk = vad.flush()
     if chunk is not None: 
-        speech_queue.put(chunk)
+        speech_queue.put((index, chunk))
+        index += 1
+        print(f"[QUEUE] speech_queue={speech_queue.qsize()}")
         
-    speech_queue.put(None)
+    # speech_queue.put(None)

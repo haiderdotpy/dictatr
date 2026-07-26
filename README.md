@@ -1,35 +1,42 @@
-# Dictatr
+![Cover](./assets/Dictatr.png)
 
 ![Platform](https://img.shields.io/badge/platform-Linux-blue)
-![Python](https://img.shields.io/badge/Python-3.12+-3776AB?logo=python&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3.12+-3776AB?logo=python\&logoColor=white)
 ![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg?logo=gnu)
 
-Local, offline push-to-talk dictation tool. Two-stage pipeline: speech-to-text via whisper.cpp, then cleanup via a local SLM (Qwen3 0.6B), then text injected as synthetic keystrokes system-wide.
+Local, offline push-to-talk dictation tool. Dictatr uses a streaming pipeline built around `whisper.cpp`, WebRTC VAD, and a configurable pool of transcription workers. A local SLM (Qwen3 0.6B) then cleans up the resulting transcript before injecting it system-wide as synthetic keyboard input.
 
 ## Features
 
-- Local-first; no cloud services required
-- Streaming speech-to-text using `whisper.cpp`
-- WebRTC Voice Activity Detection (VAD)
-- Local transcript cleanup with Ollama (Qwen3 0.6B)
-- System-wide push-to-talk input
-- Works in any application via synthetic keyboard events
+* Local-first; no cloud services required
+* Streaming speech-to-text using `whisper.cpp`
+* WebRTC Voice Activity Detection (VAD)
+* Configurable Whisper thread count and transcription worker count
+* Local transcript cleanup with Ollama (Qwen3 0.6B)
+* System-wide push-to-talk input
+* Works in any application via synthetic keyboard events
+* Built-in benchmarking mode for testing performance on different hardware
 
 ## Prerequisites
 
-- **whisper.cpp** — clone and build separately (not vendored):
+* **whisper.cpp** — clone and build separately (not vendored):
+
   ```bash
   git clone https://github.com/ggerganov/whisper.cpp
   cd whisper.cpp
   cmake -B build && cmake --build build --config Release
-  ./models/download-ggml-model.sh small.en
+  ./models/download-ggml-model.sh base.en
   ```
-- **Ollama** with the cleanup model installed:
+
+* **Ollama** with the cleanup model installed:
 
   ```bash
   ollama pull qwen3:0.6b
   ```
-- Python 3.12+ with `uv`
+
+* Python 3.12+ with `uv`
+
+> **Note:** Dictatr supports different Whisper models. Download the model you want to use and pass its filename to `dictatr` or `test.sh`. For example, `ggml-tiny.en`, `ggml-base.en`, or a quantized model such as `ggml-base.en-q5_0`.
 
 ## Installation
 
@@ -51,6 +58,87 @@ Start Dictatr from any terminal:
 ```bash
 dictatr
 ```
+
+Hold **Right Ctrl** while speaking, then release it to transcribe and inject the text into the currently focused application.
+
+### Configuring Dictatr
+
+The launcher accepts three optional arguments:
+
+```bash
+dictatr <whisper_threads> <stt_workers> <model>
+```
+
+For example:
+
+```bash
+dictatr 2 2 ggml-tiny.en
+```
+
+This runs Whisper with 2 threads, uses 2 transcription workers, and loads the Tiny English model.
+
+If no arguments are provided, the defaults are:
+
+```text
+Whisper threads: 2
+STT workers:     3
+Model:           ggml-base.en
+```
+
+The optimal configuration depends heavily on the hardware the application is running on. More threads or workers do not necessarily mean lower latency.
+
+## Benchmarking
+
+Dictatr includes a separate test/benchmark mode for evaluating the pipeline without manually speaking into the microphone.
+
+```bash
+./scripts/test.sh <whisper_threads> <stt_workers> <model>
+```
+
+For example:
+
+```bash
+./scripts/test.sh 2 2 ggml-base.en
+```
+
+The benchmark feeds recorded WAV files into the same 20 ms frame → VAD → transcription pipeline used by Dictatr. This allows different Whisper models, thread counts, and transcription worker counts to be compared reproducibly.
+
+Unlike normal Dictatr operation, **the benchmark does not type the resulting transcript into the active application**. It reports metrics such as:
+
+* STT processing time
+* STT latency relative to the duration of the speech
+* Cleanup latency
+* End-to-end latency
+* STT real-time factor (RTF)
+* Total pipeline RTF
+
+Example:
+
+```text
+[STT]               21.85s
+[STT LATENCY]        1.60s
+[CLEANUP]            2.62s
+[TYPING]             0.90s
+[TOTAL]             25.37s
+[E2E LATENCY]        5.12s
+[STT RTF]            1.08
+[TOTAL RTF]          1.25
+```
+
+The benchmark is particularly useful for finding a configuration that works well on your own machine. For example, a faster machine may be able to run a larger Whisper model while maintaining acceptable latency, while a lower-powered CPU may benefit from a smaller or quantized model.
+
+### Benchmarking different configurations
+
+Try different combinations of Whisper threads, STT workers, and models:
+
+```bash
+./scripts/test.sh 1 2 ggml-tiny.en
+./scripts/test.sh 2 2 ggml-tiny.en
+./scripts/test.sh 2 3 ggml-base.en
+./scripts/test.sh 2 2 ggml-base.en-q5_0
+```
+
+The goal is not simply to maximize throughput. A good configuration should keep the transcription queue from continuously growing while maintaining acceptable transcription quality and latency.
 
 ## Architecture
 
@@ -81,20 +169,26 @@ dictatr
                                             ▼
                                  speech_queue (Queue)
                                             │
-                                            ▼
-                              Transcription Worker
+                         ┌──────────────────┴──────────────────┐
+                         │                  │                 │
+                         ▼                  ▼                 ▼
+                  STT Worker 1       STT Worker 2       STT Worker N
+                         │                  │                 │
+                         └──────────────────┬──────────────────┘
                                             │
                                             ▼
-                         whisper.cpp Server (Streaming)
+                               whisper.cpp Server
                                             │
                                             ▼
-                              transcript_chunks (list)
+                              transcript_chunks
+                                            │
+                              sort by chunk index
                                             │
                                             ▼
-                      Join transcript after recording ends
+                         Join transcript after recording ends
                                             │
                                             ▼
-                        LLM Cleanup (Qwen3 via Ollama)
+                       LLM Cleanup (Qwen3 via Ollama)
                                             │
                                             ▼
                      System-wide Keyboard Injection
@@ -109,23 +203,25 @@ dictatr
 2. `sounddevice` streams 20 ms audio frames from the microphone.
 3. Each frame is pushed into a thread-safe `frame_queue`.
 4. A dedicated VAD worker uses **WebRTC VAD** to detect speech boundaries.
-5. Completed speech segments are emitted into a `speech_queue`.
-6. A transcription worker streams each segment to the local `whisper.cpp` server.
-7. Partial transcripts are accumulated while recording is still in progress.
-8. When the hotkey is released, the remaining audio is flushed and the final transcript is assembled.
-9. The complete transcript is cleaned up using a local language model served by **Ollama**.
-10. The polished text is injected into the currently focused application via synthetic keyboard events.
+5. Completed speech segments are assigned a sequential index and emitted into a `speech_queue`.
+6. Multiple transcription workers consume speech segments from the shared queue.
+7. Each worker sends its segment to the local `whisper.cpp` server.
+8. Transcripts retain their original chunk indices so that parallel processing does not change the order of the final transcript.
+9. When the hotkey is released, remaining audio is flushed and the transcript chunks are assembled in their original order.
+10. The complete transcript is cleaned up using a local language model served by **Ollama**.
+11. The polished text is injected into the currently focused application via synthetic keyboard events.
 
 ## Project layout
 
-```
+```text
 Dictatr
 ├── install.sh
 ├── main.py
 ├── pyproject.toml
 ├── README.md
 ├── scripts
-│   └── run.sh
+│   ├── run.sh
+│   └── test.sh
 ├── src
 │   ├── audio_capture.py
 │   ├── cleanup_client.py
@@ -134,6 +230,12 @@ Dictatr
 │   ├── stt_client.py
 │   ├── transcription_worker.py
 │   └── vad_worker.py
+├── test.py
+├── test_audio
+│   ├── 001.wav
+│   ├── 002.wav
+│   ├── 003.wav
+│   └── 004.wav
 ├── uv.lock
 └── whisper.cpp
 ```

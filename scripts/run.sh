@@ -1,5 +1,14 @@
 #!/usr/bin/env bash
 
+WHISPER_THREADS=${1:-2}
+STT_WORKERS=${2:-3}
+MODEL=${3:-ggml-base.en}
+
+echo "Dictatr"
+echo "Model:            $MODEL"
+echo "Whisper threads:  $WHISPER_THREADS"
+echo "STT workers:      $STT_WORKERS"
+
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -21,8 +30,8 @@ trap cleanup SIGINT SIGTERM
 echo "Starting whisper.cpp server..."
 
 ./whisper.cpp/build/bin/whisper-server \
-    -m ./whisper.cpp/models/ggml-small.en.bin \
-    -t 8 \
+    -m ./whisper.cpp/models/${MODEL}.bin \
+    -t ${WHISPER_THREADS} \
     --host 127.0.0.1 \
     --port 8080 &
 
@@ -33,6 +42,7 @@ sleep 2
 echo "Starting Dictatr..."
 
 LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libstdc++.so.6 \
-uv run python main.py
+uv run python main.py \
+    --stt-workers "$STT_WORKERS"
 
 cleanup

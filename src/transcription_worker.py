@@ -16,13 +16,17 @@ def pcm_to_wav(pcm_bytes, sample_rate=16000):
 
 def transcription_worker(speech_queue, transcript_chunks):
     while True:
-        chunk = speech_queue.get()
+        item = speech_queue.get()
 
-        if chunk is None:
+        if item is None:
             break
+
+        index, chunk = item
+
+        print(f"[STT] starting chunk {index}; queue={speech_queue.qsize()}")
 
         wav = pcm_to_wav(chunk)
         transcript = speechtotext(wav)
 
         if transcript is not None:
-            transcript_chunks.append(transcript)
+            transcript_chunks.append((index, transcript))

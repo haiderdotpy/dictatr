@@ -120,7 +120,7 @@ def type_text(text):
         ui.syn()
         ui.write(ecodes.EV_KEY, key, 0)
         ui.syn()
-        time.sleep(0.005)
+        time.sleep(0.002)
 
     if shifted:
         ui.write(ecodes.EV_KEY, SHIFT, 0)

@@ -7,6 +7,19 @@ from src.transcription_worker import transcription_worker
 from queue import Queue
 import time
 import threading
+import argparse
+
+parser = argparse.ArgumentParser()
+
+parser.add_argument(
+    "--stt-workers",
+    type=int,
+    default=3
+)
+
+args = parser.parse_args()
+
+TRANSCRIPT_WORKERS = args.stt_workers
 
 def main():
     print("Dictatr ready. Hold Right Ctrl to dictate.")
@@ -18,19 +31,30 @@ def main():
         transcript_chunks = []
 
         vad_thread = threading.Thread(target=vad_worker, args=(frame_queue, speech_queue))
-        transcript_thread = threading.Thread(target=transcription_worker, args=(speech_queue, transcript_chunks))
+        transcript_threads = [
+            threading.Thread(target=transcription_worker, args=(speech_queue, transcript_chunks))
+            for _ in range(TRANSCRIPT_WORKERS)
+        ]
+
 
         vad_thread.start()
-        transcript_thread.start()
+        for transcript_thread in transcript_threads:
+            transcript_thread.start()
 
         wait_for_recording(frame_queue)
 
         start = time.perf_counter()
 
         vad_thread.join()
-        transcript_thread.join()
+        for _ in range(TRANSCRIPT_WORKERS):
+            speech_queue.put(None)
+        for transcript_thread in transcript_threads:
+            transcript_thread.join()
 
-        transcript = ' '.join(transcript_chunks)
+        transcript_chunks.sort(key=lambda x: x[0])
+        transcript = " ".join(
+            chunk_indexed[1] for chunk_indexed in transcript_chunks if chunk_indexed is not None
+        )
 
         stt_time = time.perf_counter() - start
 
