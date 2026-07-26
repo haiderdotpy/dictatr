@@ -4,6 +4,8 @@
 ![Python](https://img.shields.io/badge/Python-3.12+-3776AB?logo=python\&logoColor=white)
 ![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg?logo=gnu)
 
+# Dictatr
+
 Local, offline push-to-talk dictation tool. Dictatr uses a streaming pipeline built around `whisper.cpp`, WebRTC VAD, and a configurable pool of transcription workers. A local SLM (Qwen3 0.6B) then cleans up the resulting transcript before injecting it system-wide as synthetic keyboard input.
 
 ## Features
@@ -170,10 +172,10 @@ The goal is not simply to maximize throughput. A good configuration should keep 
                                  speech_queue (Queue)
                                             │
                          ┌──────────────────┴──────────────────┐
-                         │                  │                 │
-                         ▼                  ▼                 ▼
+                         │                  │                  │
+                         ▼                  ▼                  ▼
                   STT Worker 1       STT Worker 2       STT Worker N
-                         │                  │                 │
+                         │                  │                  │
                          └──────────────────┬──────────────────┘
                                             │
                                             ▼
