@@ -1,11 +1,24 @@
-import ollama 
+import ollama
 
-def cleanup_transcript(transcript):
+def choose_model():
+    models_response = ollama.list()
+
+    smallest_model = min(
+        (m for m in models_response.models if m.size is not None),
+        key=lambda m: m.size
+    )
+
+    return smallest_model.model
+
+def cleanup_transcript(transcript, model=None):
     '''Cleans up audio transcripts and returns output.'''
+    if model is None:
+        model = choose_model()
+
     response = ollama.chat(
-        model="qwen3:0.6b",
+        model=model,
         messages=[{
-            'role': 'user', 
+            'role': 'user',
             'content': f'''
                 You are converting spoken dictation into text that someone intended to type.
 

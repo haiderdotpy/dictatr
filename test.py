@@ -19,6 +19,12 @@ parser.add_argument(
     default=3
 )
 
+parser.add_argument(
+    "--cleanup-model",
+    type=str,
+    default=None
+)
+
 args = parser.parse_args()
 
 FRAME_DURATION_MS = 20
@@ -27,6 +33,7 @@ SAMPLE_WIDTH = 2
 CHANNELS = 1
 SPEED = 1
 TRANSCRIPT_WORKERS = args.stt_workers
+CLEANUP_MODEL = args.cleanup_model
 
 AUDIO_FILES = [
     'test_audio/001.wav',
@@ -35,7 +42,7 @@ AUDIO_FILES = [
     'test_audio/004.wav',
 ]
 
-def feed_wav(path, frame_queue): 
+def feed_wav(path, frame_queue):
     print(f"\n[TEST]  Playing {path}")
 
     with wave.open(path, "rb") as wav:
@@ -43,7 +50,7 @@ def feed_wav(path, frame_queue):
         assert wav.getsampwidth() == SAMPLE_WIDTH
         assert wav.getnchannels() == CHANNELS
 
-        frame_size = int(SAMPLE_RATE*FRAME_DURATION_MS/1000); 
+        frame_size = int(SAMPLE_RATE*FRAME_DURATION_MS/1000);
 
         print("channels:", wav.getnchannels())
         print("sample width:", wav.getsampwidth())
@@ -51,7 +58,7 @@ def feed_wav(path, frame_queue):
         print("frames:", wav.getnframes())
         print("duration:", wav.getnframes() / wav.getframerate())
 
-        while True: 
+        while True:
             frame = wav.readframes(frame_size)
 
             if not frame:
@@ -74,6 +81,8 @@ def feed_silence(frame_queue, duration_ms=500):
 
 def main():
     print("Dictatr ready.")
+    if CLEANUP_MODEL is not None:
+        print(f"Using {CLEANUP_MODEL} for transcript cleanup.")
 
     for i, audio_file in enumerate(AUDIO_FILES):
 
@@ -94,7 +103,7 @@ def main():
         start = time.perf_counter()
 
         # wait_for_recording(frame_queue)
-        
+
         feed_wav(audio_file, frame_queue=frame_queue)
         if i < len(AUDIO_FILES) - 1:
             feed_silence(frame_queue, 500)
@@ -120,7 +129,7 @@ def main():
 
         start = time.perf_counter()
 
-        cleaned = cleanup_transcript(transcript)
+        cleaned = cleanup_transcript(transcript, CLEANUP_MODEL)
         cleanup_time = time.perf_counter() - start
 
         print(transcript)
@@ -130,17 +139,17 @@ def main():
         # type_text(f"[TEST INDEX {i}]\n[TRANSCRIPTION]\n{cleaned}\n\n")
         # typing_time = time.perf_counter() - start
 
-        with wave.open(audio_file, "rb") as wav: 
+        with wave.open(audio_file, "rb") as wav:
             duration = wav.getnframes() / wav.getframerate()
 
         print(f"[STT]               {stt_time:.2f}s")
         print(f"[STT LATENCY]       {stt_time-duration:.2f}s")
         print(f"[CLEANUP]           {cleanup_time:.2f}s")
         # print(f"[TYPING]            {typing_time:.2f}s")
-        print(f"[TOTAL]             {(stt_time + cleanup_time):.2f}s") # 
-        print(f"[E2E LATENCY]       {(stt_time + cleanup_time)-duration:.2f}s") # 
+        print(f"[TOTAL]             {(stt_time + cleanup_time):.2f}s") #
+        print(f"[E2E LATENCY]       {(stt_time + cleanup_time)-duration:.2f}s") #
         print(f"[STT RTF]           {(stt_time)/duration:.2f}")
-        print(f"[TOTAL RTF]         {(stt_time + cleanup_time)/duration:.2f}") # 
+        print(f"[TOTAL RTF]         {(stt_time + cleanup_time)/duration:.2f}") #
 
 
 if __name__ == "__main__":

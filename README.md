@@ -6,7 +6,7 @@
 
 # Dictatr
 
-Local, offline push-to-talk dictation tool. Dictatr uses a streaming pipeline built around `whisper.cpp`, WebRTC VAD, and a configurable pool of transcription workers. A local SLM (Qwen3 0.6B) then cleans up the resulting transcript before injecting it system-wide as synthetic keyboard input.
+Local, offline push-to-talk dictation tool. Dictatr uses a streaming pipeline built around `whisper.cpp`, WebRTC VAD, and a configurable pool of transcription workers. A local language model served through Ollama then cleans up the resulting transcript before injecting it system-wide as synthetic keyboard input.
 
 ## Features
 
@@ -14,7 +14,9 @@ Local, offline push-to-talk dictation tool. Dictatr uses a streaming pipeline bu
 * Streaming speech-to-text using `whisper.cpp`
 * WebRTC Voice Activity Detection (VAD)
 * Configurable Whisper thread count and transcription worker count
-* Local transcript cleanup with Ollama (Qwen3 0.6B)
+* Local transcript cleanup with Ollama
+* Automatically selects the smallest installed Ollama model by default to minimize cleanup latency
+* Optional manual selection of the Ollama cleanup model
 * System-wide push-to-talk input
 * Works in any application via synthetic keyboard events
 * Built-in benchmarking mode for testing performance on different hardware
@@ -30,11 +32,13 @@ Local, offline push-to-talk dictation tool. Dictatr uses a streaming pipeline bu
   ./models/download-ggml-model.sh base.en
   ```
 
-* **Ollama** with the cleanup model installed:
+* **Ollama** with at least one local model installed:
 
   ```bash
   ollama pull qwen3:0.6b
   ```
+
+  Dictatr can use any installed Ollama model for transcript cleanup.
 
 * Python 3.12+ with `uv`
 
@@ -65,11 +69,21 @@ Hold **Right Ctrl** while speaking, then release it to transcribe and inject the
 
 ### Configuring Dictatr
 
-The launcher accepts three optional arguments:
+The launcher accepts up to four optional arguments:
 
 ```bash
-dictatr <whisper_threads> <stt_workers> <model>
+dictatr <whisper_threads> <stt_workers> <whisper_model> <ollama_model>
 ```
+
+For example:
+
+```bash
+dictatr 2 2 ggml-tiny.en qwen3:0.6b
+```
+
+This runs Whisper with 2 threads, uses 2 transcription workers, loads the Tiny English model, and uses `qwen3:0.6b` for transcript cleanup.
+
+The Ollama cleanup model is optional. If it is not specified, Dictatr queries Ollama for the locally installed models and automatically selects the smallest one. This is intended to minimize cleanup latency while still allowing users to explicitly choose a model when desired.
 
 For example:
 
@@ -77,24 +91,25 @@ For example:
 dictatr 2 2 ggml-tiny.en
 ```
 
-This runs Whisper with 2 threads, uses 2 transcription workers, and loads the Tiny English model.
+will automatically select the smallest installed Ollama model.
 
 If no arguments are provided, the defaults are:
 
 ```text
 Whisper threads: 2
 STT workers:     3
-Model:           ggml-base.en
+Whisper model:   ggml-base.en
+Ollama model:    smallest installed model
 ```
 
-The optimal configuration depends heavily on the hardware the application is running on. More threads or workers do not necessarily mean lower latency.
+The optimal configuration depends heavily on the hardware the application is running on. More threads or workers do not necessarily mean lower latency, and a smaller Ollama model does not necessarily provide the best cleanup quality.
 
 ## Benchmarking
 
 Dictatr includes a separate test/benchmark mode for evaluating the pipeline without manually speaking into the microphone.
 
 ```bash
-./scripts/test.sh <whisper_threads> <stt_workers> <model>
+./scripts/test.sh <whisper_threads> <stt_workers> <whisper_model> [ollama_model]
 ```
 
 For example:
@@ -103,7 +118,15 @@ For example:
 ./scripts/test.sh 2 2 ggml-base.en
 ```
 
-The benchmark feeds recorded WAV files into the same 20 ms frame → VAD → transcription pipeline used by Dictatr. This allows different Whisper models, thread counts, and transcription worker counts to be compared reproducibly.
+If no Ollama model is specified, the benchmark automatically selects the smallest locally installed model.
+
+To explicitly benchmark a particular cleanup model:
+
+```bash
+./scripts/test.sh 2 2 ggml-base.en qwen3:0.6b
+```
+
+The benchmark feeds recorded WAV files into the same 20 ms frame → VAD → transcription pipeline used by Dictatr. This allows different Whisper models, thread counts, transcription worker counts, and Ollama cleanup models to be compared reproducibly.
 
 Unlike normal Dictatr operation, **the benchmark does not type the resulting transcript into the active application**. It reports metrics such as:
 
@@ -131,13 +154,14 @@ The benchmark is particularly useful for finding a configuration that works well
 
 ### Benchmarking different configurations
 
-Try different combinations of Whisper threads, STT workers, and models:
+Try different combinations of Whisper threads, STT workers, Whisper models, and Ollama cleanup models:
 
 ```bash
 ./scripts/test.sh 1 2 ggml-tiny.en
 ./scripts/test.sh 2 2 ggml-tiny.en
 ./scripts/test.sh 2 3 ggml-base.en
 ./scripts/test.sh 2 2 ggml-base.en-q5_0
+./scripts/test.sh 2 2 ggml-base.en qwen3:0.6b
 ```
 
 The goal is not simply to maximize throughput. A good configuration should keep the transcription queue from continuously growing while maintaining acceptable transcription quality and latency.
@@ -172,10 +196,10 @@ The goal is not simply to maximize throughput. A good configuration should keep 
                                  speech_queue (Queue)
                                             │
                          ┌──────────────────┴──────────────────┐
-                         │                  │                  │
-                         ▼                  ▼                  ▼
+                         │                  │                 │
+                         ▼                  ▼                 ▼
                   STT Worker 1       STT Worker 2       STT Worker N
-                         │                  │                  │
+                         │                  │                 │
                          └──────────────────┬──────────────────┘
                                             │
                                             ▼
@@ -190,7 +214,7 @@ The goal is not simply to maximize throughput. A good configuration should keep 
                          Join transcript after recording ends
                                             │
                                             ▼
-                       LLM Cleanup (Qwen3 via Ollama)
+                       LLM Cleanup (Ollama)
                                             │
                                             ▼
                      System-wide Keyboard Injection
@@ -211,7 +235,8 @@ The goal is not simply to maximize throughput. A good configuration should keep 
 8. Transcripts retain their original chunk indices so that parallel processing does not change the order of the final transcript.
 9. When the hotkey is released, remaining audio is flushed and the transcript chunks are assembled in their original order.
 10. The complete transcript is cleaned up using a local language model served by **Ollama**.
-11. The polished text is injected into the currently focused application via synthetic keyboard events.
+11. If no Ollama model was explicitly configured, Dictatr selects the smallest installed model before performing cleanup.
+12. The polished text is injected into the currently focused application via synthetic keyboard events.
 
 ## Project layout
 

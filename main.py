@@ -17,12 +17,21 @@ parser.add_argument(
     default=3
 )
 
+parser.add_argument(
+    "--cleanup-model",
+    type=str,
+    default=None
+)
+
 args = parser.parse_args()
 
 TRANSCRIPT_WORKERS = args.stt_workers
+CLEANUP_MODEL = args.cleanup_model
 
 def main():
     print("Dictatr ready. Hold Right Ctrl to dictate.")
+    if CLEANUP_MODEL is not None:
+        print(f"Using {CLEANUP_MODEL} for transcript cleanup.")
 
     while True:
 
@@ -64,7 +73,7 @@ def main():
 
         start = time.perf_counter()
 
-        cleaned = cleanup_transcript(transcript)
+        cleaned = cleanup_transcript(transcript, CLEANUP_MODEL)
         cleanup_time = time.perf_counter() - start
 
         print(transcript)

@@ -3,8 +3,10 @@
 WHISPER_THREADS=${1:-2}
 STT_WORKERS=${2:-3}
 MODEL=${3:-ggml-base.en}
+OLLAMA=${4}
 
 echo "Dictatr"
+if [[ -n "$4" ]]; then echo "Cleanup model:    $OLLAMA"; fi
 echo "Model:            $MODEL"
 echo "Whisper threads:  $WHISPER_THREADS"
 echo "STT workers:      $STT_WORKERS"
@@ -41,8 +43,15 @@ sleep 2
 
 echo "Starting Dictatr..."
 
+MODEL_ARGS=()
+
+if [[ -n "$4" ]]; then
+    MODEL_ARGS+=(--cleanup-model "$4")
+fi
+
 LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libstdc++.so.6 \
 uv run python main.py \
-    --stt-workers "$STT_WORKERS"
+    --stt-workers "$STT_WORKERS" \
+    "${MODEL_ARGS[@]}"
 
 cleanup
