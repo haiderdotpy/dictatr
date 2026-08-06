@@ -29,7 +29,7 @@ def cleanup_transcript(transcript, model=None):
                 - Keep all information. Do not summarize, expand, or paraphrase.
                 - Format the output based on the speaker's intent:
                     - Use paragraphs for normal prose.
-                    - Use bullet lists when the speaker is clearly listing items.
+                    - Use bullet lists when the speaker is listing items.
                     - Use numbered lists for ordered steps or instructions.
                     - Preserve quoted text when obvious.
                     - If the structure is unclear, leave it as normal prose.
@@ -46,4 +46,4 @@ def cleanup_transcript(transcript, model=None):
         keep_alive=-1
     )
 
-    return response['message']['content']
+    return response['message']['content'].replace('\n', ' ') # replace newline characters as it can result in pressing enter prematurely by inject.py

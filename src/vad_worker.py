@@ -1,29 +1,29 @@
 import webrtcvad
 
-class VADSegmenter: 
+class VADSegmenter:
     def __init__(self):
         self.vad = webrtcvad.Vad(2);
         self.current_chunk = []
         self.silent_frames = 0
         self.in_speech = False
-    
+
     def process_frame(self, frame_bytes, sample_rate=16000):
         speech = self.vad.is_speech(frame_bytes, sample_rate)
-        if speech: 
+        if speech:
             self.current_chunk.append(frame_bytes)
             self.silent_frames = 0
             self.in_speech = True
         else:
             if self.in_speech:
                 self.silent_frames += 1
-                if self.silent_frames > 5: 
+                if self.silent_frames > 5:
                     # End of speech segment
                     segment = b''.join(self.current_chunk)
                     self.current_chunk = []
                     self.silent_frames = 0
                     self.in_speech = False
                     return segment
-    
+
     def flush(self):
         if self.current_chunk:
             segment = b''.join(self.current_chunk)
@@ -32,7 +32,7 @@ class VADSegmenter:
             self.in_speech = False
             return segment
         return None
-    
+
 def vad_worker(frame_queue, speech_queue):
     vad = VADSegmenter()
     index = 0
@@ -45,15 +45,15 @@ def vad_worker(frame_queue, speech_queue):
 
         chunk = vad.process_frame(frame)
 
-        if chunk is not None: 
+        if chunk is not None:
             speech_queue.put((index, chunk))
             index += 1
-            print(f"[QUEUE] speech_queue={speech_queue.qsize()}")
+            # print(f"[QUEUE] speech_queue={speech_queue.qsize()}")
 
     chunk = vad.flush()
-    if chunk is not None: 
+    if chunk is not None:
         speech_queue.put((index, chunk))
         index += 1
-        print(f"[QUEUE] speech_queue={speech_queue.qsize()}")
-        
+        # print(f"[QUEUE] speech_queue={speech_queue.qsize()}")
+
     # speech_queue.put(None)

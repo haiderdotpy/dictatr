@@ -1,5 +1,5 @@
 from src.stt_client import speechtotext
-import io 
+import io
 import wave
 
 def pcm_to_wav(pcm_bytes, sample_rate=16000):
@@ -23,7 +23,7 @@ def transcription_worker(speech_queue, transcript_chunks):
 
         index, chunk = item
 
-        print(f"[STT] starting chunk {index}; queue={speech_queue.qsize()}")
+        # print(f"[STT] starting chunk {index}; queue={speech_queue.qsize()}")
 
         wav = pcm_to_wav(chunk)
         transcript = speechtotext(wav)

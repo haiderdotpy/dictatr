@@ -67,6 +67,8 @@ dictatr
 
 Hold **Right Ctrl** while speaking, then release it to transcribe and inject the text into the currently focused application.
 
+> **Note:** The whisper.cpp server writes its logs to `logs/whisper.log` instead of the terminal.
+
 ### Configuring Dictatr
 
 The launcher accepts up to four optional arguments:
@@ -243,6 +245,8 @@ The goal is not simply to maximize throughput. A good configuration should keep 
 ```text
 Dictatr
 ├── install.sh
+├── logs
+│   └── whisper.log
 ├── main.py
 ├── pyproject.toml
 ├── README.md

@@ -31,11 +31,14 @@ trap cleanup SIGINT SIGTERM
 
 echo "Starting whisper.cpp server..."
 
+LOG_DIR="logs"
+mkdir -p "$LOG_DIR"
+
 ./whisper.cpp/build/bin/whisper-server \
     -m ./whisper.cpp/models/${MODEL}.bin \
     -t ${WHISPER_THREADS} \
     --host 127.0.0.1 \
-    --port 8080 &
+    --port 8080 > "$LOG_DIR/whisper.log" 2>&1 &
 
 WHISPER_PID=$!
 

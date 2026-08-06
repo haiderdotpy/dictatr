@@ -29,6 +29,14 @@ TRANSCRIPT_WORKERS = args.stt_workers
 CLEANUP_MODEL = args.cleanup_model
 
 def main():
+    print(f"""
+        ██████╗ ██╗ ██████╗████████╗ █████╗ ████████╗██████╗
+        ██╔══██╗██║██╔════╝╚══██╔══╝██╔══██╗╚══██╔══╝██╔══██╗
+        ██║  ██║██║██║        ██║   ███████║   ██║   ██████╔╝
+        ██║  ██║██║██║        ██║   ██╔══██║   ██║   ██╔══██╗
+        ██████╔╝██║╚██████╗   ██║   ██║  ██║   ██║   ██║  ██║
+        ╚═════╝ ╚═╝ ╚═════╝   ╚═╝   ╚═╝  ╚═╝   ╚═╝   ╚═╝  ╚═╝
+""")
     print("Dictatr ready. Hold Right Ctrl to dictate.")
     if CLEANUP_MODEL is not None:
         print(f"Using {CLEANUP_MODEL} for transcript cleanup.")

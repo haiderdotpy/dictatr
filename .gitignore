@@ -18,6 +18,11 @@ config.toml
 # Test audio samples
 sample/
 
-# whisper.cpp build artifacts
-whisper.cpp/build/
-whisper.cpp/models/*.bin
+# Runtime logs
+logs/
+
+# Jupyter metadata
+.ipynb_checkpoints/
+
+# External dependency clone (not vendored)
+whisper.cpp/
