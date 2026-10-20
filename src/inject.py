@@ -96,6 +96,10 @@ def tap(key):
     ui.syn()
 
 
+def close():
+    ui.close()
+
+
 def type_text(text):
     shifted = False
 

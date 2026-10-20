@@ -17,12 +17,22 @@ config.toml
 
 # Test audio samples
 sample/
+test_audio/*_noise.wav
 
 # Runtime logs
 logs/
 
 # Jupyter metadata
 .ipynb_checkpoints/
+
+# Generated benchmark data (machine-specific)
+whisper_metadata.json
+analysis.py
+analysis/benchmarks.jsonl
+analysis/result/
+analysis/analysis.ipynb
+analysis/analysis_annotated.ipynb
+scripts/run_benchmarks.sh
 
 # External dependency clone (not vendored)
 whisper.cpp/

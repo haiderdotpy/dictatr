@@ -5,7 +5,7 @@ import time
 import evdev
 from evdev import ecodes
 
-from src.audio_capture import start_capture, stop_capture
+from src.audio_capture import start_capture, stop_capture, abort_capture
 
 
 HOTKEY = ecodes.KEY_RIGHTCTRL
@@ -22,6 +22,8 @@ def find_keyboards():
 
         if ecodes.KEY_A in caps:
             keyboards.append(dev)
+        else:
+            dev.close()
 
     return keyboards
 
@@ -50,38 +52,43 @@ def wait_for_recording(frame_queue):
 
     print("Waiting for hotkey...")
 
-    while True:
-        ready, _, _ = select.select(device_map, [], [])
+    try:
+        while True:
+            ready, _, _ = select.select(device_map, [], [])
 
-        for fd in ready:
-            device = device_map[fd]
+            for fd in ready:
+                device = device_map[fd]
 
-            for event in device.read():
+                for event in device.read():
 
-                if event.type != ecodes.EV_KEY:
-                    continue
-
-                if event.code != HOTKEY:
-                    continue
-
-                # Key pressed
-                if event.value == 1 and not recording:
-                    recording = True
-                    press_time = time.monotonic()
-                    start_capture(frame_queue)
-                    print("Recording...")
-
-                # Key released
-                elif event.value == 0 and recording:
-                    recording = False
-
-                    duration = time.monotonic() - press_time
-
-                    if duration < MIN_HOLD_TIME:
-                        print("Ignored short press.")
+                    if event.type != ecodes.EV_KEY:
                         continue
 
-                    print(f"Recorded {duration:.2f}s")
+                    if event.code != HOTKEY:
+                        continue
 
-                    frame_queue.put(None)
-                    return stop_capture()
+                    # Key pressed
+                    if event.value == 1 and not recording:
+                        recording = True
+                        press_time = time.monotonic()
+                        start_capture(frame_queue)
+                        print("Recording...")
+
+                    # Key released
+                    elif event.value == 0 and recording:
+                        recording = False
+
+                        duration = time.monotonic() - press_time
+
+                        if duration < MIN_HOLD_TIME:
+                            print("Ignored short press.")
+                            continue
+
+                        print(f"Recorded {duration:.2f}s")
+
+                        frame_queue.put(None)
+                        return stop_capture()
+    finally:
+        for device in devices:
+            device.close()
+        abort_capture()

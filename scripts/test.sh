@@ -22,12 +22,14 @@ cleanup() {
     echo
     echo "Shutting down..."
 
-    kill "$WHISPER_PID" 2>/dev/null || true
-
-    exit
+    if [[ -n "${WHISPER_PID:-}" ]]; then
+        kill "$WHISPER_PID" 2>/dev/null || true
+    fi
 }
 
-trap cleanup SIGINT SIGTERM
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 echo "Starting whisper.cpp server..."
 
@@ -53,6 +55,3 @@ LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libstdc++.so.6 \
 uv run python test.py \
     --stt-workers "$STT_WORKERS" \
     "${MODEL_ARGS[@]}"
-
-
-cleanup

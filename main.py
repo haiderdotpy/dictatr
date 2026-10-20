@@ -1,13 +1,15 @@
 from src.hotkey_listener import wait_for_recording
 from src.stt_client import speechtotext
 from src.cleanup_client import cleanup_transcript
-from src.inject import type_text
+from src.audio_capture import abort_capture
+from src.inject import type_text, close as close_injection
 from src.vad_worker import vad_worker
 from src.transcription_worker import transcription_worker
 from queue import Queue
 import time
 import threading
 import argparse
+import signal
 
 parser = argparse.ArgumentParser()
 
@@ -41,60 +43,101 @@ def main():
     if CLEANUP_MODEL is not None:
         print(f"Using {CLEANUP_MODEL} for transcript cleanup.")
 
-    while True:
+    frame_queue = None
+    speech_queue = None
+    threads = []
 
-        frame_queue = Queue()
-        speech_queue = Queue()
-        transcript_chunks = []
+    def handle_signal(signum, frame):
+        raise KeyboardInterrupt
 
-        vad_thread = threading.Thread(target=vad_worker, args=(frame_queue, speech_queue))
-        transcript_threads = [
-            threading.Thread(target=transcription_worker, args=(speech_queue, transcript_chunks))
-            for _ in range(TRANSCRIPT_WORKERS)
-        ]
+    signal.signal(signal.SIGTERM, handle_signal)
 
+    try:
+        while True:
 
-        vad_thread.start()
-        for transcript_thread in transcript_threads:
-            transcript_thread.start()
+            frame_queue = Queue()
+            speech_queue = Queue()
+            transcript_chunks = []
 
-        wait_for_recording(frame_queue)
+            vad_thread = threading.Thread(
+                target=vad_worker, args=(frame_queue, speech_queue), daemon=True
+            )
+            transcript_threads = [
+                threading.Thread(
+                    target=transcription_worker,
+                    args=(speech_queue, transcript_chunks),
+                    daemon=True,
+                )
+                for _ in range(TRANSCRIPT_WORKERS)
+            ]
 
-        start = time.perf_counter()
+            threads = [vad_thread, *transcript_threads]
 
-        vad_thread.join()
-        for _ in range(TRANSCRIPT_WORKERS):
-            speech_queue.put(None)
-        for transcript_thread in transcript_threads:
-            transcript_thread.join()
+            vad_thread.start()
+            for transcript_thread in transcript_threads:
+                transcript_thread.start()
 
-        transcript_chunks.sort(key=lambda x: x[0])
-        transcript = " ".join(
-            chunk_indexed[1] for chunk_indexed in transcript_chunks if chunk_indexed is not None
-        )
+            wait_for_recording(frame_queue)
 
-        stt_time = time.perf_counter() - start
+            start = time.perf_counter()
 
-        if not transcript:
-            print("STT failed, skipping.")
-            continue
+            vad_thread.join()
+            for _ in range(TRANSCRIPT_WORKERS):
+                speech_queue.put(None)
+            for transcript_thread in transcript_threads:
+                transcript_thread.join()
 
-        start = time.perf_counter()
+            transcript_chunks.sort(key=lambda x: x[0])
+            transcript = " ".join(
+                chunk_indexed[1] for chunk_indexed in transcript_chunks if chunk_indexed is not None
+            )
 
-        cleaned = cleanup_transcript(transcript, CLEANUP_MODEL)
-        cleanup_time = time.perf_counter() - start
+            stt_time = time.perf_counter() - start
 
-        print(transcript)
-        print("→", cleaned)
+            if not transcript:
+                print("STT failed, skipping.")
+                continue
 
-        start = time.perf_counter()
-        type_text(cleaned)
-        typing_time = time.perf_counter() - start
+            start = time.perf_counter()
 
-        print(f"[STT]     {stt_time:.2f}s (perceived)")
-        print(f"[CLEANUP] {cleanup_time:.2f}s")
-        print(f"[TYPING]  {typing_time:.2f}s")
-        print(f"[TOTAL]   {stt_time + cleanup_time + typing_time:.2f}s")
+            cleaned = cleanup_transcript(transcript, CLEANUP_MODEL)
+            cleanup_time = time.perf_counter() - start
+
+            print(transcript)
+            print("→", cleaned)
+
+            start = time.perf_counter()
+            type_text(cleaned)
+            typing_time = time.perf_counter() - start
+
+            print(f"[STT]     {stt_time:.2f}s (perceived)")
+            print(f"[CLEANUP] {cleanup_time:.2f}s")
+            print(f"[TYPING]  {typing_time:.2f}s")
+            print(f"[TOTAL]   {stt_time + cleanup_time + typing_time:.2f}s")
+
+    except KeyboardInterrupt:
+        pass
+    finally:
+        signal.signal(signal.SIGINT, signal.SIG_IGN)
+        signal.signal(signal.SIGTERM, signal.SIG_IGN)
+
+        if speech_queue is not None:
+            for _ in range(TRANSCRIPT_WORKERS):
+                speech_queue.put(None)
+
+        if frame_queue is not None:
+            frame_queue.put(None)
+
+        abort_capture()
+
+        for thread in threads:
+            if thread.is_alive():
+                thread.join(timeout=1)
+
+        try:
+            close_injection()
+        except Exception:
+            pass
 
 
 if __name__ == "__main__":

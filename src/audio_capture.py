@@ -17,8 +17,26 @@ def _callback(indata, frames, time, status):
     if _frame_queue is not None:
         _frame_queue.put(indata.copy().tobytes())
 
+def _close_stream():
+    global _stream
+
+    if _stream is None:
+        return
+
+    try:
+        _stream.stop()
+    finally:
+        try:
+            _stream.close()
+        except Exception:
+            pass
+        _stream = None
+
 def start_capture(frame_queue):
     global _frames, _stream, _frame_queue
+
+    abort_capture()
+
     _frames = []
     _frame_queue = frame_queue
     _stream = sd.InputStream(
@@ -31,14 +49,29 @@ def start_capture(frame_queue):
     _stream.start()
 
 def stop_capture() -> io.BytesIO:
-    global _stream
-    _stream.stop()
-    _stream.close()
-    _stream = None
+    global _frames, _frame_queue
 
-    audio = np.concatenate(_frames, axis=0)
+    _close_stream()
+
+    if _frames:
+        audio = np.concatenate(_frames, axis=0)
+    else:
+        audio = np.empty((0, CHANNELS), dtype=np.int16)
 
     buffer = io.BytesIO()
     write_wav(buffer, SAMPLE_RATE, audio)
     buffer.seek(0)
+    _frames = []
+    _frame_queue = None
     return buffer
+
+def abort_capture():
+    global _frames, _frame_queue
+
+    try:
+        _close_stream()
+    except Exception:
+        pass
+
+    _frames = []
+    _frame_queue = None
